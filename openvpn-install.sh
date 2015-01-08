@@ -1,4 +1,4 @@
-#!/bin/bash
+y#!/bin/bash
 # OpenVPN road warrior installer for Debian-based distros
 
 # This script will only work on Debian-based systems. It isn't bulletproof but
@@ -30,13 +30,13 @@ newclient () {
 	sed -i "/cert client.crt/d" ~/$1.ovpn
 	sed -i "/key client.key/d" ~/$1.ovpn
 	echo "<ca>" >> ~/$1.ovpn
-	cat /etc/openvpn/easy-rsa/2.0/keys/ca.crt >> ~/$1.ovpn
+	cat /usr/share/easy-rsa/keys/ca.crt >> ~/$1.ovpn
 	echo "</ca>" >> ~/$1.ovpn
 	echo "<cert>" >> ~/$1.ovpn
-	cat /etc/openvpn/easy-rsa/2.0/keys/$1.crt >> ~/$1.ovpn
+	cat /usr/share/easy-rsa/keys/$1.crt >> ~/$1.ovpn
 	echo "</cert>" >> ~/$1.ovpn
 	echo "<key>" >> ~/$1.ovpn
-	cat /etc/openvpn/easy-rsa/2.0/keys/$1.key >> ~/$1.ovpn
+	cat /usr/share/easy-rsa/keys/$1.key >> ~/$1.ovpn
 	echo "</key>" >> ~/$1.ovpn
 }
 
@@ -69,7 +69,7 @@ if [[ -e /etc/openvpn/server.conf ]]; then
 			echo "Tell me a name for the client cert"
 			echo "Please, use one word only, no special characters"
 			read -p "Client name: " -e -i client CLIENT
-			cd /etc/openvpn/easy-rsa/2.0/
+			cd /usr/share/easy-rsa/
 			source ./vars
 			# build-key for the client
 			export KEY_CN="$CLIENT"
@@ -85,15 +85,15 @@ if [[ -e /etc/openvpn/server.conf ]]; then
 			echo ""
 			echo "Tell me the existing client name"
 			read -p "Client name: " -e -i client CLIENT
-			cd /etc/openvpn/easy-rsa/2.0/
-			. /etc/openvpn/easy-rsa/2.0/vars
-			. /etc/openvpn/easy-rsa/2.0/revoke-full $CLIENT
+			cd /usr/share/easy-rsa/
+			. /usr/share/easy-rsa/vars
+			. /usr/share/easy-rsa/revoke-full $CLIENT
 			# If it's the first time revoking a cert, we need to add the crl-verify line
 			if grep -q "crl-verify" "/etc/openvpn/server.conf"; then
 				echo ""
 				echo "Certificate for client $CLIENT revoked"
 			else
-				echo "crl-verify /etc/openvpn/easy-rsa/2.0/keys/crl.pem" >> "/etc/openvpn/server.conf"
+				echo "crl-verify /usr/share/doc/openvpn/examples/sample-keys/crl.pem" >> "/etc/openvpn/server.conf"
 				/etc/init.d/openvpn restart
 				echo ""
 				echo "Certificate for client $CLIENT revoked"
@@ -155,22 +155,23 @@ else
 	apt-get install openvpn iptables openssl -y
 	cp -R /usr/share/doc/openvpn/examples/easy-rsa/ /etc/openvpn
 	# easy-rsa isn't available by default for Debian Jessie and newer
-	if [[ ! -d /etc/openvpn/easy-rsa/2.0/ ]]; then
+	if [[ ! -d /usr/share/easy-rsa/ ]]; then
 		wget --no-check-certificate -O ~/easy-rsa.tar.gz https://github.com/OpenVPN/easy-rsa/archive/2.2.2.tar.gz
 		tar xzf ~/easy-rsa.tar.gz -C ~/
-		mkdir -p /etc/openvpn/easy-rsa/2.0/
-		cp ~/easy-rsa-2.2.2/easy-rsa/2.0/* /etc/openvpn/easy-rsa/2.0/
+		mkdir -p /usr/share/easy-rsa/
+		cp ~/easy-rsa-2.2.2/easy-rsa/2.0/* /usr/share/easy-rsa/
 		rm -rf ~/easy-rsa-2.2.2
 		rm -rf ~/easy-rsa.tar.gz
 	fi
-	cd /etc/openvpn/easy-rsa/2.0/
+	cd /usr/share/easy-rsa/
 	# Let's fix one thing first...
 	cp -u -p openssl-1.0.0.cnf openssl.cnf
 	# Fuck you NSA - 1024 bits was the default for Debian Wheezy and older
-	sed -i 's|export KEY_SIZE=1024|export KEY_SIZE=2048|' /etc/openvpn/easy-rsa/2.0/vars
+	sed -i 's|export KEY_SIZE=1024|export KEY_SIZE=2048|' /usr/share/easy-rsa/vars
+	perl -p -i -e 's|^(subjectAltName=)|#$1|;' /usr/share/easy-rsa/openssl-1.0.0.cnf # @todo: update this to sed -i...
 	# Create the PKI
-	. /etc/openvpn/easy-rsa/2.0/vars
-	. /etc/openvpn/easy-rsa/2.0/clean-all
+	. /usr/share/easy-rsa/vars
+	. /usr/share/easy-rsa/clean-all
 	# The following lines are from build-ca. I don't use that script directly
 	# because it's interactive and we don't want that. Yes, this could break
 	# the installation script if build-ca changes in the future.
@@ -184,12 +185,12 @@ else
 	export EASY_RSA="${EASY_RSA:-.}"
 	"$EASY_RSA/pkitool" $CLIENT
 	# DH params
-	. /etc/openvpn/easy-rsa/2.0/build-dh
+	. /usr/share/easy-rsa/build-dh
 	# Let's configure the server
 	cd /usr/share/doc/openvpn/examples/sample-config-files
 	gunzip -d server.conf.gz
 	cp server.conf /etc/openvpn/
-	cd /etc/openvpn/easy-rsa/2.0/keys
+	cd /usr/share/easy-rsa/keys
 	cp ca.crt ca.key dh2048.pem server.crt server.key /etc/openvpn
 	cd /etc/openvpn/
 	# Set the server configuration
